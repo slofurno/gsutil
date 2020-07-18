@@ -1,0 +1,12 @@
+#!/bin/bash
+
+cat <<"EOF" > certs.go
+package main
+
+const AlpineCerts = `
+EOF
+
+gzip -k -c ca-certificates.crt | base64 >> certs.go
+printf '`' >> certs.go
+
+GOOS=linux CGO_ENABLED=0 CFLAGS=0 go build -a

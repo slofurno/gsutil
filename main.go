@@ -1,14 +1,44 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/base64"
 	"io"
+	"io/ioutil"
+	"net"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"cloud.google.com/go/storage"
 )
+
+func getAlpineCerts() []byte {
+	decoded, err := base64.StdEncoding.DecodeString(AlpineCerts)
+	if err != nil {
+		panic(err)
+	}
+
+	br := bytes.NewReader(decoded)
+
+	gz, err := gzip.NewReader(br)
+	if err != nil {
+		panic(err)
+	}
+	defer gz.Close()
+
+	b, err := ioutil.ReadAll(gz)
+	if err != nil {
+		panic(err)
+	}
+
+	return b
+}
 
 func isGSPath(path string) bool {
 	return strings.Index(path, "gs://") == 0
@@ -23,6 +53,30 @@ func parseGSPath(path string) (string, string) {
 func doCopy(srcPath, dstPath string) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute*2)
 	defer cancel()
+
+	certs := x509.NewCertPool()
+	if ok := certs.AppendCertsFromPEM(getAlpineCerts()); !ok {
+		panic("failed to read certs")
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs: certs,
+	}
+
+	http.DefaultTransport = &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+			DualStack: true,
+		}).DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		TLSClientConfig:       tlsConfig,
+	}
 
 	client, err := storage.NewClient(ctx)
 	if err != nil {
