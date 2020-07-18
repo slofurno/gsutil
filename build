@@ -9,4 +9,4 @@ EOF
 gzip -k -c ca-certificates.crt | base64 >> certs.go
 printf '`' >> certs.go
 
-GOOS=linux CGO_ENABLED=0 CFLAGS=0 go build -a
+GOOS=linux CGO_ENABLED=0 CFLAGS=0 go build -trimpath -ldflags="-s -w" -a
