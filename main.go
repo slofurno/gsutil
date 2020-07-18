@@ -102,9 +102,12 @@ func doCopy(srcPath, dstPath string) {
 	if isGSPath(dstPath) {
 		bucket, key := parseGSPath(dstPath)
 		writer := client.Bucket(bucket).Object(key).NewWriter(ctx)
-		defer writer.Close()
 
 		if _, err := io.Copy(writer, src); err != nil {
+			panic(err)
+		}
+
+		if err := writer.Close(); err != nil {
 			panic(err)
 		}
 	} else if dstPath == "-" {
@@ -121,9 +124,12 @@ func doCopy(srcPath, dstPath string) {
 		if err != nil {
 			panic(err)
 		}
-		defer writer.Close()
 
 		if _, err := io.Copy(writer, src); err != nil {
+			panic(err)
+		}
+
+		if err := writer.Close(); err != nil {
 			panic(err)
 		}
 
